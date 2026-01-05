@@ -1,0 +1,45 @@
+# ======================
+# Python / Django
+# ======================
+__pycache__/
+*.py[cod]
+*.log
+
+# Django
+db.sqlite3
+staticfiles/
+media/
+
+# Migrations cache
+*.pyc
+
+# ======================
+# Virtual Environment
+# ======================
+pansy/
+venv/
+env/
+
+# ======================
+# Environment variables
+# ======================
+.env
+.env.*
+
+# ======================
+# OS / Editor
+# ======================
+.DS_Store
+.idea/
+.vscode/
+
+# ======================
+# Tests / Coverage
+# ======================
+htmlcov/
+.coverage
+
+# ======================
+# Docs (keep md files!)
+# ======================
+# NOTE: We KEEP .md files, so nothing ignored here
