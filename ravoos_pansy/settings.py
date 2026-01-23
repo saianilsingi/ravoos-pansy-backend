@@ -86,7 +86,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://ravoos-pansy-backend.onrender.com",
-    "https://ravoos-pansy-frontend.onrender.com",
+    "https://ravoos-pansy.pages.dev",
 ]
 
 MIDDLEWARE = [
