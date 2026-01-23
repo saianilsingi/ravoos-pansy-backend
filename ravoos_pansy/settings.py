@@ -31,15 +31,28 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 DEBUG = os.getenv("DEBUG", "False") == "True"
 
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "0.0.0.0",
+    "ravoos-pansy-backend.onrender.com",
+]
 
 CSRF_TRUSTED_ORIGINS = [
     "https://ravoos-pansy-backend.onrender.com",
 ]
 
+if DEBUG:
+    CSRF_TRUSTED_ORIGINS += [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+
 # Because this is an API-first backend
-CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SECURE = True
+
+CSRF_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_HTTPONLY = True
 
 # CORS (you already use django-cors-headers)
 
@@ -66,10 +79,15 @@ INSTALLED_APPS = [
     'corsheaders',
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 
-
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://ravoos-pansy-backend.onrender.com",
+    "https://ravoos-pansy-frontend.onrender.com",
+]
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -120,9 +138,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # }
 DATABASES = {
     "default": dj_database_url.config(
-        default=os.environ.get("DATABASE_URL"),
+        default=os.getenv("DATABASE_URL"),
         conn_max_age=600,
-        ssl_require=True,
+        ssl_require=not DEBUG,
     )
 }
 
