@@ -31,6 +31,20 @@ class MeView(APIView):
             "role": "admin" if user.is_staff else "user"
         })
 
+    def put(self, request):
+        user = request.user
+        name = request.data.get("name")
+        if not name or not name.strip():
+            return Response({"error": "Name is required"}, status=400)
+        user.name = name.strip()
+        user.save()
+        return Response({
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "role": "admin" if user.is_staff else "user"
+        })
+
 #ADDRESS VIEWS (CRUD)
 
 class AddressListCreateView(ListCreateAPIView):
