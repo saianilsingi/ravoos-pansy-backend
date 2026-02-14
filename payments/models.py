@@ -26,11 +26,18 @@ class Payment(models.Model):
         related_name="payment"
     )
 
-    # Amount locked at intent time
+    # Financial breakdown — frozen at intent time (immutable truth)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    gst = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    discount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     currency = models.CharField(max_length=10, default="INR")
 
-    # Temporary checkout data
+    # Snapshots — frozen at intent time, used at verification
+    cart_snapshot = models.JSONField(default=list)
+    address_snapshot = models.TextField(default="")
+
+    # Checkout references
     address = models.ForeignKey(
         Address,
         on_delete=models.PROTECT
@@ -41,6 +48,7 @@ class Payment(models.Model):
         null=True,
         blank=True
     )
+    coupon_code = models.CharField(max_length=20, null=True, blank=True)
 
     # Gateway metadata
     gateway = models.CharField(max_length=20, default="razorpay")

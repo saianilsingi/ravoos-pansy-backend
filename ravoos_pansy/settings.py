@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'cart',
     'orders',
     'coupons',
+    'payments',
 
     'django.contrib.admin',
     'django.contrib.auth',
@@ -193,4 +194,9 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.AllowAny',
     ]
 }
+
+# Razorpay
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
+RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
 
