@@ -1,7 +1,9 @@
+import warnings
 from decimal import Decimal
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from products.permissions import IsAdmin
 from cart.models import CartItem
 from users.models import Address
 from coupons.models import Coupon
@@ -13,6 +15,12 @@ class CheckoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        warnings.warn(
+            "CheckoutView is deprecated. Use /api/payments/create-intent/ "
+            "followed by /api/payments/verify/ for payment-backed checkout.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         user = request.user
         address_id = request.data.get("address_id")
         coupon_code = request.data.get("coupon")
@@ -136,7 +144,7 @@ class OrderDeleteAllView(APIView):
     
 
 class OrderStatusUpdateView(APIView):
-    permission_classes = [IsAuthenticated]  # dev only
+    permission_classes = [IsAuthenticated, IsAdmin]
 
     def patch(self, request, pk):
         try:
