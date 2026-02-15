@@ -112,6 +112,10 @@ class VerifyPaymentView(APIView):
                 return Response({
                     "message": "Payment already verified",
                     "order_id": payment.order_id,
+                    "subtotal": str(payment.subtotal),
+                    "gst": str(payment.gst),
+                    "discount": str(payment.discount),
+                    "total": str(payment.amount),
                 })
 
             if payment.status == "failed":
@@ -131,6 +135,10 @@ class VerifyPaymentView(APIView):
         return Response({
             "message": "Payment successful",
             "order_id": order.id,
+            "subtotal": str(payment.subtotal),
+            "gst": str(payment.gst),
+            "discount": str(payment.discount),
+            "total": str(payment.amount),
         })
 
 
