@@ -1,9 +1,15 @@
 from decimal import Decimal
 from django.conf import settings
+from django.db.models import F
 from cart.models import CartItem
 from coupons.models import Coupon
 from orders.models import Order, OrderItem
+from products.models import Product
 import razorpay
+
+
+class InsufficientStockError(Exception):
+    pass
 
 
 def get_razorpay_client():
@@ -45,6 +51,12 @@ def calculate_cart_total(user, coupon_code=None):
     subtotal = Decimal("0")
     cart_snapshot = []
     for item in cart_items:
+        if item.product.stock == 0:
+            raise ValueError(f"'{item.product.name}' is out of stock")
+        if item.quantity > item.product.stock:
+            raise ValueError(
+                f"'{item.product.name}' only has {item.product.stock} in stock"
+            )
         subtotal += item.product.price * item.quantity
         cart_snapshot.append({
             "product_id": item.product.id,
@@ -87,11 +99,14 @@ def format_address(address):
 
 def fulfill_payment(payment):
     """
-    Creates Order + OrderItems from a Payment's frozen snapshot data.
-    Clears the user's cart and links the Order to the Payment.
+    Creates Order + OrderItems from a Payment's frozen snapshot data,
+    and atomically deducts stock for each product.
 
     MUST be called inside transaction.atomic() with the Payment row
     already locked via select_for_update().
+
+    Raises InsufficientStockError if any product lacks sufficient stock.
+    The caller's transaction.atomic() will roll back all changes.
 
     Returns the created Order.
     """
@@ -111,6 +126,17 @@ def fulfill_payment(payment):
             quantity=item["quantity"],
             price=item["price"],
         )
+
+        # Atomic stock deduction: WHERE stock >= quantity prevents negative
+        updated = Product.objects.filter(
+            id=item["product_id"],
+            stock__gte=item["quantity"],
+        ).update(stock=F("stock") - item["quantity"])
+
+        if updated == 0:
+            raise InsufficientStockError(
+                f"Insufficient stock for product '{item['name']}'"
+            )
 
     payment.order = order
     payment.save(update_fields=["order"])

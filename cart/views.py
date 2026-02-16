@@ -44,12 +44,25 @@ class AddToCartView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+        if product.stock == 0:
+            return Response(
+                {"error": "This product is out of stock"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         cart_item, created = CartItem.objects.get_or_create(
             user=request.user,
             product=product
         )
 
-        cart_item.quantity = cart_item.quantity + quantity if not created else quantity
+        desired_quantity = (cart_item.quantity + quantity) if not created else quantity
+        if desired_quantity > product.stock:
+            return Response(
+                {"error": f"Only {product.stock} available"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        cart_item.quantity = desired_quantity
         cart_item.save()
 
         return Response(
@@ -87,7 +100,7 @@ class UpdateCartItemView(APIView):
             )
 
         try:
-            cart_item = CartItem.objects.get(
+            cart_item = CartItem.objects.select_related("product").get(
                 id=item_id,
                 user=request.user
             )
@@ -102,6 +115,12 @@ class UpdateCartItemView(APIView):
             return Response(
                 {"message": "Item removed from cart"},
                 status=status.HTTP_200_OK
+            )
+
+        if quantity > cart_item.product.stock:
+            return Response(
+                {"error": f"Only {cart_item.product.stock} available"},
+                status=status.HTTP_400_BAD_REQUEST
             )
 
         cart_item.quantity = quantity
