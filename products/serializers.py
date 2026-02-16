@@ -20,6 +20,8 @@ class ProductReadSerializer(serializers.ModelSerializer):
             "price",
             "category",
             "image",
+            "avg_rating",
+            "review_count",
         ]
 
 #WRITE serializer (for POST / PUT)
