@@ -23,5 +23,9 @@ class Product(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # Denormalized rating aggregates — updated by reviews.services.refresh_product_rating()
+    avg_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
+    review_count = models.PositiveIntegerField(default=0)
+
     def __str__(self):
         return self.name

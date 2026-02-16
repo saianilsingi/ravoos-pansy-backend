@@ -38,6 +38,14 @@ class Order(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["user", "status"],
+                name="order_user_status",
+            ),
+        ]
+
     def __str__(self):
         return f"Order #{self.id} - {self.user}"
 
