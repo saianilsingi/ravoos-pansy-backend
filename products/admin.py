@@ -8,6 +8,6 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ("name", "price", "category", "is_active")
+    list_display = ("name", "price", "category", "stock", "is_active")
     list_filter = ("category", "is_active")
 

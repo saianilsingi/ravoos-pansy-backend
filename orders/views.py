@@ -1,8 +1,11 @@
 import warnings
 from decimal import Decimal
+from django.db import transaction
+from django.db.models import F
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from products.models import Product
 from products.permissions import IsAdmin
 from cart.models import CartItem
 from users.models import Address
@@ -166,8 +169,20 @@ class OrderStatusUpdateView(APIView):
         if new_status not in allowed_statuses:
             return Response({"error": "Invalid status"}, status=400)
 
-        order.status = new_status
-        order.save(update_fields=["status"])
+        # Restore stock when cancelling an order (prevent double-restore)
+        if new_status == "cancelled" and order.status != "cancelled":
+            with transaction.atomic():
+                order.status = new_status
+                order.save(update_fields=["status"])
+
+                for item in order.items.select_related("product").all():
+                    if item.product_id:
+                        Product.objects.filter(id=item.product_id).update(
+                            stock=F("stock") + item.quantity
+                        )
+        else:
+            order.status = new_status
+            order.save(update_fields=["status"])
 
         return Response({
             "message": "Order status updated",

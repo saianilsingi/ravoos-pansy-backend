@@ -20,6 +20,7 @@ class ProductReadSerializer(serializers.ModelSerializer):
             "price",
             "category",
             "image",
+            "stock",
             "avg_rating",
             "review_count",
         ]
@@ -38,6 +39,7 @@ class ProductWriteSerializer(serializers.ModelSerializer):
             "price",
             "category",
             "image",
+            "stock",
         ]
 
 

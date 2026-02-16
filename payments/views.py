@@ -14,6 +14,7 @@ import razorpay
 
 from .models import Payment
 from .services import (
+    InsufficientStockError,
     calculate_cart_total,
     create_razorpay_order,
     verify_razorpay_signature,
@@ -97,40 +98,52 @@ class VerifyPaymentView(APIView):
             ).update(status="failed")
             return Response({"error": "Payment verification failed"}, status=400)
 
-        with transaction.atomic():
-            try:
-                payment = (
-                    Payment.objects
-                    .select_for_update()
-                    .get(razorpay_order_id=razorpay_order_id, user=request.user)
-                )
-            except Payment.DoesNotExist:
-                return Response({"error": "Payment not found"}, status=404)
+        try:
+            with transaction.atomic():
+                try:
+                    payment = (
+                        Payment.objects
+                        .select_for_update()
+                        .get(razorpay_order_id=razorpay_order_id, user=request.user)
+                    )
+                except Payment.DoesNotExist:
+                    return Response({"error": "Payment not found"}, status=404)
 
-            # Idempotency: already processed and order exists
-            if payment.status == "paid" and payment.order_id:
-                return Response({
-                    "message": "Payment already verified",
-                    "order_id": payment.order_id,
-                    "subtotal": str(payment.subtotal),
-                    "gst": str(payment.gst),
-                    "discount": str(payment.discount),
-                    "total": str(payment.amount),
-                })
+                # Idempotency: already processed and order exists
+                if payment.status == "paid" and payment.order_id:
+                    return Response({
+                        "message": "Payment already verified",
+                        "order_id": payment.order_id,
+                        "subtotal": str(payment.subtotal),
+                        "gst": str(payment.gst),
+                        "discount": str(payment.discount),
+                        "total": str(payment.amount),
+                    })
 
-            if payment.status == "failed":
-                return Response({"error": "Payment has failed"}, status=400)
+                if payment.status == "failed":
+                    return Response({"error": "Payment has failed"}, status=400)
 
-            # Mark as paid and store Razorpay IDs
-            payment.status = "paid"
-            payment.razorpay_payment_id = razorpay_payment_id
-            payment.razorpay_signature = razorpay_signature
-            payment.save(update_fields=[
-                "status", "razorpay_payment_id", "razorpay_signature"
-            ])
+                # Mark as paid and store Razorpay IDs
+                payment.status = "paid"
+                payment.razorpay_payment_id = razorpay_payment_id
+                payment.razorpay_signature = razorpay_signature
+                payment.save(update_fields=[
+                    "status", "razorpay_payment_id", "razorpay_signature"
+                ])
 
-            # Create Order + OrderItems from frozen snapshot
-            order = fulfill_payment(payment)
+                # Create Order + OrderItems + deduct stock
+                order = fulfill_payment(payment)
+
+        except InsufficientStockError:
+            # atomic() rolled back everything — mark payment as failed separately
+            Payment.objects.filter(
+                razorpay_order_id=razorpay_order_id,
+                user=request.user,
+            ).update(status="failed")
+            return Response(
+                {"error": "One or more items went out of stock. Payment will be refunded."},
+                status=409,
+            )
 
         return Response({
             "message": "Payment successful",
@@ -170,35 +183,46 @@ class RazorpayWebhookView(APIView):
         razorpay_order_id = payment_entity["order_id"]
         razorpay_payment_id = payment_entity["id"]
 
-        with transaction.atomic():
-            try:
-                payment = (
-                    Payment.objects
-                    .select_for_update()
-                    .get(razorpay_order_id=razorpay_order_id)
-                )
-            except Payment.DoesNotExist:
-                logger.warning(
-                    "Webhook received for unknown order: %s", razorpay_order_id
-                )
-                return Response({"status": "not_found"}, status=200)
+        try:
+            with transaction.atomic():
+                try:
+                    payment = (
+                        Payment.objects
+                        .select_for_update()
+                        .get(razorpay_order_id=razorpay_order_id)
+                    )
+                except Payment.DoesNotExist:
+                    logger.warning(
+                        "Webhook received for unknown order: %s", razorpay_order_id
+                    )
+                    return Response({"status": "not_found"}, status=200)
 
-            # Idempotency: already processed and order exists
-            if payment.status == "paid" and payment.order_id:
-                return Response({"status": "already_processed"})
+                # Idempotency: already processed and order exists
+                if payment.status == "paid" and payment.order_id:
+                    return Response({"status": "already_processed"})
 
-            if payment.status == "failed":
-                logger.warning(
-                    "Webhook for previously failed payment: %s", razorpay_order_id
-                )
-                return Response({"status": "payment_failed"}, status=400)
+                if payment.status == "failed":
+                    logger.warning(
+                        "Webhook for previously failed payment: %s", razorpay_order_id
+                    )
+                    return Response({"status": "payment_failed"}, status=400)
 
-            # Mark as paid
-            payment.status = "paid"
-            payment.razorpay_payment_id = razorpay_payment_id
-            payment.save(update_fields=["status", "razorpay_payment_id"])
+                # Mark as paid
+                payment.status = "paid"
+                payment.razorpay_payment_id = razorpay_payment_id
+                payment.save(update_fields=["status", "razorpay_payment_id"])
 
-            # Create Order + OrderItems from frozen snapshot
-            fulfill_payment(payment)
+                # Create Order + OrderItems + deduct stock
+                fulfill_payment(payment)
+
+        except InsufficientStockError:
+            # atomic() rolled back — mark payment as failed separately
+            Payment.objects.filter(
+                razorpay_order_id=razorpay_order_id,
+            ).update(status="failed")
+            logger.error(
+                "Stock insufficient during webhook fulfillment: %s", razorpay_order_id
+            )
+            return Response({"status": "stock_unavailable"}, status=409)
 
         return Response({"status": "ok"})

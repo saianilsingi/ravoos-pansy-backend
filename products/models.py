@@ -23,9 +23,19 @@ class Product(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    stock = models.PositiveIntegerField(default=0)
+
     # Denormalized rating aggregates — updated by reviews.services.refresh_product_rating()
     avg_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
     review_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(stock__gte=0),
+                name="product_stock_non_negative",
+            ),
+        ]
 
     def __str__(self):
         return self.name
