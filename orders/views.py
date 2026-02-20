@@ -5,13 +5,14 @@ from django.db.models import F
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
 from products.models import Product
 from products.permissions import IsAdmin
 from cart.models import CartItem
 from users.models import Address
 from coupons.models import Coupon
 from .models import Order, OrderItem
-from .serializers import OrderSerializer
+from .serializers import OrderSerializer, AdminOrderSerializer
 
 #CHECKOUT VIEW
 class CheckoutView(APIView):
@@ -191,3 +192,40 @@ class OrderStatusUpdateView(APIView):
         })
 
 
+class AdminOrderPagination(PageNumberPagination):
+    page_size = 15
+    page_size_query_param = "page_size"
+    max_page_size = 50
+
+
+class AdminOrderListView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        queryset = Order.objects.select_related("user").prefetch_related(
+            "items__product"
+        ).order_by("-created_at")
+
+        status_filter = request.query_params.get("status")
+        if status_filter and status_filter in dict(Order.STATUS_CHOICES):
+            queryset = queryset.filter(status=status_filter)
+
+        paginator = AdminOrderPagination()
+        page = paginator.paginate_queryset(queryset, request)
+        serializer = AdminOrderSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+
+class AdminOrderDetailView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk):
+        try:
+            order = Order.objects.select_related("user").prefetch_related(
+                "items__product"
+            ).get(id=pk)
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found"}, status=404)
+
+        serializer = AdminOrderSerializer(order)
+        return Response(serializer.data)
